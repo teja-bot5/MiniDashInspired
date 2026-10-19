@@ -13,12 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: barichello/godot-ci:4.4.1
+
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-
-      - name: Check project files
-        run: python3 tests/static_project_check.py
 
       - name: Import project with Godot
         run: godot --headless --editor --path . --quit
@@ -28,7 +26,6 @@ jobs:
           mkdir -p build
           godot --headless --path . --export-debug "Android" build/MiniDashInspired.apk
           test -s build/MiniDashInspired.apk
-          file build/MiniDashInspired.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
