@@ -23,45 +23,84 @@ jobs:
         shell: bash
         run: |
           set -eux
+
+          echo "Checking Godot..."
           godot --version
+
+          echo "Checking Java..."
           java -version
+
+          echo "Checking Android SDK..."
           test -d /usr/lib/android-sdk
-          mkdir -p /root/.local/share/godot/export_templates/4.4.1.stable
-          wget -q https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz -O /tmp/templates.tpz
+
+          echo "Preparing Godot export templates..."
+          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.4.1.stable"
+          mkdir -p "$TEMPLATE_DIR"
+
+          wget -q \
+            https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz \
+            -O /tmp/templates.tpz
+
           unzip -oq /tmp/templates.tpz -d /tmp/godot-templates
-          cp -r /tmp/godot-templates/templates/. /root/.local/share/godot/export_templates/4.4.1.stable/
+          cp -r /tmp/godot-templates/templates/. "$TEMPLATE_DIR/"
+
+          echo "Creating a fresh debug keystore..."
+          rm -f "$HOME/debug.keystore"
+
           keytool -genkeypair -noprompt \
-            -keystore /root/debug.keystore \
-            -storepass android -keypass android \
-            -alias androiddebugkey -keyalg RSA -keysize 2048 \
+            -keystore "$HOME/debug.keystore" \
+            -storepass android \
+            -keypass android \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
+
+          echo "Checking required files..."
+          test -s "$TEMPLATE_DIR/android_debug.apk"
+          test -s "$TEMPLATE_DIR/android_release.apk"
+          test -s "$HOME/debug.keystore"
 
       - name: Configure Godot Android paths
         shell: bash
         run: |
           set -eux
-          mkdir -p /root/.config/godot
-          cat > /root/.config/godot/editor_settings-4.4.tres <<'EOF'
+
+          mkdir -p "$HOME/.config/godot"
+
+          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
           [gd_resource type="EditorSettings" format=3]
+
           [resource]
           export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"
           export/android/android_sdk_path = "/usr/lib/android-sdk"
-          export/android/debug_keystore = "/root/debug.keystore"
+          export/android/debug_keystore = "$HOME/debug.keystore"
           export/android/debug_keystore_user = "androiddebugkey"
           export/android/debug_keystore_pass = "android"
           EOF
+
           test -x /usr/lib/jvm/java-17-openjdk-amd64/bin/java
           test -d /usr/lib/android-sdk
 
       - name: Import project with Godot
-        run: godot --headless --editor --path . --quit
-
-      - name: Export Android APK
+        shell: bash
         run: |
           set -eux
+          godot --headless --editor --path . --quit
+
+      - name: Export Android APK
+        shell: bash
+        run: |
+          set -eux
+
           mkdir -p build
-          godot --headless --path . --export-debug "Android" build/MiniDashInspired.apk
+
+          godot --headless \
+            --path . \
+            --export-debug "Android" \
+            build/MiniDashInspired.apk
+
           test -s build/MiniDashInspired.apk
           file build/MiniDashInspired.apk
 
