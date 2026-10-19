@@ -1,3 +1,4 @@
+
 name: Build Android APK
 
 on:
@@ -18,14 +19,51 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Verify Android build environment
+        shell: bash
+        run: |
+          set -eux
+          godot --version
+          java -version
+          test -d /usr/lib/android-sdk
+          mkdir -p /root/.local/share/godot/export_templates/4.4.1.stable
+          wget -q https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz -O /tmp/templates.tpz
+          unzip -oq /tmp/templates.tpz -d /tmp/godot-templates
+          cp -r /tmp/godot-templates/templates/. /root/.local/share/godot/export_templates/4.4.1.stable/
+          keytool -genkeypair -noprompt \
+            -keystore /root/debug.keystore \
+            -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Configure Godot Android paths
+        shell: bash
+        run: |
+          set -eux
+          mkdir -p /root/.config/godot
+          cat > /root/.config/godot/editor_settings-4.4.tres <<'EOF'
+          [gd_resource type="EditorSettings" format=3]
+          [resource]
+          export/android/java_sdk_path = "/usr/lib/jvm/java-17-openjdk-amd64"
+          export/android/android_sdk_path = "/usr/lib/android-sdk"
+          export/android/debug_keystore = "/root/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+          test -x /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+          test -d /usr/lib/android-sdk
+
       - name: Import project with Godot
         run: godot --headless --editor --path . --quit
 
       - name: Export Android APK
         run: |
+          set -eux
           mkdir -p build
           godot --headless --path . --export-debug "Android" build/MiniDashInspired.apk
           test -s build/MiniDashInspired.apk
+          file build/MiniDashInspired.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
